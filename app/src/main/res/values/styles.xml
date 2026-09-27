@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.DarkOrchestra" parent="@android:style/Theme.NoTitleBar.Fullscreen">
+        <item name="android:windowBackground">#04060a</item>
+        <item name="android:colorBackground">#04060a</item>
+    </style>
+</resources>
