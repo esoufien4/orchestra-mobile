@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/api.dart';
 import 'widgets/sphere.dart';
-import 'widgets/stats.dart';
-import 'widgets/buttons.dart';
+import 'widgets/top_bar.dart';
+import 'widgets/agent_cards.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,11 +21,12 @@ class OrchestraScreen extends StatefulWidget {
 
 class _OrchestraScreenState extends State<OrchestraScreen> with SingleTickerProviderStateMixin {
   Map<String, dynamic>? data;
-  String transcript = "Touchez un agent pour lui donner un ordre";
+  String transcript = "Touchez un agent ou envoyez un ordre direct";
   String activeAgent = "atlas";
   bool isSpeaking = false;
   late AnimationController _ctrl;
   Timer? _timer;
+
   @override
   void initState() {
     super.initState();
@@ -53,11 +54,12 @@ class _OrchestraScreenState extends State<OrchestraScreen> with SingleTickerProv
     setState(() { transcript = "« $text »..."; activeAgent = target; });
     final res = await OrchestraApi.sendCommand(text);
     if (res != null && mounted) {
-      final speech = res['speech'] ?? 'Ordre reçu.';
+      final speech = res['speech'] ?? 'Ordre reçu Commandant.';
       setState(() { transcript = speech; activeAgent = res['target'] ?? target; });
       OrchestraApi.speak(speech);
     }
   }
+
   Color _getColor(String a) {
     if (a == 'cipher') return const Color(0xFF06B6D4);
     if (a == 'vesper') return const Color(0xFF10B981);
@@ -73,6 +75,7 @@ class _OrchestraScreenState extends State<OrchestraScreen> with SingleTickerProv
       backgroundColor: const Color(0xFF04060A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF090D16),
+        elevation: 0,
         title: Row(
           children: [
             Container(width: 8, height: 8, decoration: BoxDecoration(color: isOnline ? const Color(0xFF10B981) : Colors.red, shape: BoxShape.circle)),
@@ -84,7 +87,11 @@ class _OrchestraScreenState extends State<OrchestraScreen> with SingleTickerProv
       body: SafeArea(
         child: Column(
           children: [
-            buildStatBar(data, isOnline),
+            buildTopBar(data, isOnline),
+            buildAgentCards(activeAgent, (id) {
+              setState(() => activeAgent = id);
+              _order("Statut de mission pour $id", id);
+            }),
             Expanded(
               child: Center(
                 child: AnimatedBuilder(
@@ -105,10 +112,33 @@ class _OrchestraScreenState extends State<OrchestraScreen> with SingleTickerProv
               child: Text(transcript, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w500)),
             ),
             const SizedBox(height: 16),
-            buildAgentButtons(_order),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  _actionBtn('🔍 Scraper Web', () => _order('Cipher cherche de nouvelles opportunités SaaS', 'cipher')),
+                  _actionBtn('⚖️ Bilan Marges', () => _order('Vesper donne le rapport financier et scores', 'vesper')),
+                  _actionBtn('✍️ Rédiger Review', () => _order('Aura prépare un article d élite', 'aura')),
+                  _actionBtn('⚡ Auditer Liens', () => _order('Nexus vérifie les liens et sentinelle', 'nexus')),
+                  _actionBtn('🚀 Cycle Complet', () => _order('Atlas lance un cycle complet de l usine', 'atlas')),
+                ],
+              ),
+            ),
             const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _actionBtn(String label, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0E131F), foregroundColor: Colors.white, side: const BorderSide(color: Color(0xFF1E293B)), shape: const StadiumBorder()),
+        onPressed: onTap,
+        child: Text(label, style: const TextStyle(fontSize: 12)),
       ),
     );
   }
