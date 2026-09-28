@@ -1,4 +1,4 @@
-name: Build Real Flutter APK
+name: Build Real Android APK
 
 on:
   push:
@@ -18,24 +18,14 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
-      - name: Generate Native Android Skeleton
-        run: |
-          flutter create --platforms=android --org com.optiradar .
-          sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.VIBRATE"/>' android/app/src/main/AndroidManifest.xml
-
-      - name: Build Standalone Release APK
-        run: |
-          flutter pub get
-          flutter build apk --release
+      - name: Build Release APK
+        run: ./gradlew assembleRelease || gradle assembleRelease
 
       - name: Upload Production APK
         uses: actions/upload-artifact@v4
         with:
           name: orchestra-app-release
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: app/build/outputs/apk/release/app-release.apk
