@@ -23,11 +23,11 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Generate Android Skeleton with Cleartext HTTP
+      - name: Generate Android Skeleton with TTS Queries & Cleartext
         run: |
           flutter create --platforms=android --org com.optiradar .
           sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.VIBRATE"/>' android/app/src/main/AndroidManifest.xml
+          sed -i '/<application/i \    <queries>\n        <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>\n        <intent><action android:name="android.speech.RecognitionService" /></intent>\n    </queries>\n    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.VIBRATE"/>' android/app/src/main/AndroidManifest.xml
 
       - name: Build Standalone Release APK
         run: |

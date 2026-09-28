@@ -3,26 +3,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/api.dart';
+import 'services/voice.dart';
 import 'widgets/sphere.dart';
 import 'widgets/top_bar.dart';
-import 'widgets/agent_cards.dart';
+import 'widgets/agent_bar.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  OrchestraApi.initTts();
-  runApp(const MaterialApp(debugShowCheckedModeBanner: false, home: OrchestraScreen()));
+  runApp(const MaterialApp(debugShowCheckedModeBanner: false, home: OrchestraApp()));
 }
 
-class OrchestraScreen extends StatefulWidget {
-  const OrchestraScreen({super.key});
+class OrchestraApp extends StatefulWidget {
+  const OrchestraApp({super.key});
   @override
-  State<OrchestraScreen> createState() => _OrchestraScreenState();
+  State<OrchestraApp> createState() => _OrchestraAppState();
 }
 
-class _OrchestraScreenState extends State<OrchestraScreen> with SingleTickerProviderStateMixin {
+class _OrchestraAppState extends State<OrchestraApp> with SingleTickerProviderStateMixin {
   Map<String, dynamic>? data;
-  String transcript = "Touchez un agent ou envoyez un ordre direct";
+  String transcript = "Touchez le micro pour parler ou un agent ci-dessus";
   String activeAgent = "atlas";
+  bool isListening = false;
   bool isSpeaking = false;
   late AnimationController _ctrl;
   Timer? _timer;
@@ -31,10 +32,11 @@ class _OrchestraScreenState extends State<OrchestraScreen> with SingleTickerProv
   void initState() {
     super.initState();
     _ctrl = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat();
+    VoiceEngine.init(() => setState(() {}));
     _refresh();
     _timer = Timer.periodic(const Duration(seconds: 3), (_) => _refresh());
-    OrchestraApi.tts.setStartHandler(() => setState(() => isSpeaking = true));
-    OrchestraApi.tts.setCompletionHandler(() => setState(() => isSpeaking = false));
+    VoiceEngine.tts.setStartHandler(() => setState(() => isSpeaking = true));
+    VoiceEngine.tts.setCompletionHandler(() => setState(() => isSpeaking = false));
   }
 
   @override
@@ -54,10 +56,28 @@ class _OrchestraScreenState extends State<OrchestraScreen> with SingleTickerProv
     setState(() { transcript = "« $text »..."; activeAgent = target; });
     final res = await OrchestraApi.sendCommand(text);
     if (res != null && mounted) {
-      final speech = res['speech'] ?? 'Ordre reçu Commandant.';
+      final speech = res['speech'] ?? 'Ordre reçu.';
       setState(() { transcript = speech; activeAgent = res['target'] ?? target; });
-      OrchestraApi.speak(speech);
+      await VoiceEngine.speak(speech);
     }
+  }
+
+  void _toggleMic() async {
+    if (isListening) {
+      await VoiceEngine.speech.stop();
+      setState(() => isListening = false);
+      return;
+    }
+    setState(() => isListening = true);
+    await VoiceEngine.speech.listen(
+      localeId: "fr_FR",
+      onResult: (val) {
+        if (val.finalResult && val.recognizedWords.isNotEmpty) {
+          setState(() => isListening = false);
+          _order(val.recognizedWords, activeAgent);
+        }
+      },
+    );
   }
 
   Color _getColor(String a) {
@@ -75,23 +95,13 @@ class _OrchestraScreenState extends State<OrchestraScreen> with SingleTickerProv
       backgroundColor: const Color(0xFF04060A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF090D16),
-        elevation: 0,
-        title: Row(
-          children: [
-            Container(width: 8, height: 8, decoration: BoxDecoration(color: isOnline ? const Color(0xFF10B981) : Colors.red, shape: BoxShape.circle)),
-            const SizedBox(width: 8),
-            Text('OPTIRADAR ORCHESTRA', style: GoogleFonts.cinzel(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFFFBBF24))),
-          ],
-        ),
+        title: Text('OPTIRADAR ORCHESTRA', style: GoogleFonts.cinzel(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFFFBBF24))),
       ),
       body: SafeArea(
         child: Column(
           children: [
             buildTopBar(data, isOnline),
-            buildAgentCards(activeAgent, (id) {
-              setState(() => activeAgent = id);
-              _order("Statut de mission pour $id", id);
-            }),
+            buildSingleAgentBar(activeAgent, (id, cmd) => _order(cmd, id)),
             Expanded(
               child: Center(
                 child: AnimatedBuilder(
@@ -112,33 +122,31 @@ class _OrchestraScreenState extends State<OrchestraScreen> with SingleTickerProv
               child: Text(transcript, textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Color(0xFFE2E8F0), fontWeight: FontWeight.w500)),
             ),
             const SizedBox(height: 16),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  _actionBtn('🔍 Scraper Web', () => _order('Cipher cherche de nouvelles opportunités SaaS', 'cipher')),
-                  _actionBtn('⚖️ Bilan Marges', () => _order('Vesper donne le rapport financier et scores', 'vesper')),
-                  _actionBtn('✍️ Rédiger Review', () => _order('Aura prépare un article d élite', 'aura')),
-                  _actionBtn('⚡ Auditer Liens', () => _order('Nexus vérifie les liens et sentinelle', 'nexus')),
-                  _actionBtn('🚀 Cycle Complet', () => _order('Atlas lance un cycle complet de l usine', 'atlas')),
-                ],
+            GestureDetector(
+              onTap: _toggleMic,
+              child: Container(
+                width: 65, height: 65,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isListening ? Colors.red : const Color(0xFFD97706),
+                  boxShadow: [BoxShadow(color: (isListening ? Colors.red : const Color(0xFFFBBF24)).withOpacity(0.4), blurRadius: 20, spreadRadius: 2)],
+                ),
+                child: Icon(isListening ? Icons.mic_off : Icons.mic, color: Colors.white, size: 32),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              color: const Color(0xFF0E131F),
+              child: Text(
+                "[DEBUG] ${VoiceEngine.debugStatus} · Host: ${isOnline ? 'Connecté (200)' : 'Erreur liaison'}",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.jetBrainsMono(fontSize: 10, color: isOnline ? const Color(0xFF10B981) : Colors.amber),
+              ),
+            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _actionBtn(String label, VoidCallback onTap) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0E131F), foregroundColor: Colors.white, side: const BorderSide(color: Color(0xFF1E293B)), shape: const StadiumBorder()),
-        onPressed: onTap,
-        child: Text(label, style: const TextStyle(fontSize: 12)),
       ),
     );
   }

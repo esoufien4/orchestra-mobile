@@ -1,7 +1,7 @@
 name: orchestra_mobile
-description: "OptiRadar Orchestra - Native Autonomous Factory Controller"
+description: "OptiRadar Orchestra - Standalone Native Controller"
 publish_to: "none"
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -12,6 +12,7 @@ dependencies:
   http: ^1.2.0
   google_fonts: ^6.1.0
   flutter_tts: ^4.2.2
+  speech_to_text: ^7.0.0
 
 flutter:
   uses-material-design: true
